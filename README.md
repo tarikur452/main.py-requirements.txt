@@ -4,11 +4,14 @@
 
 
 # Key Steps 
-User Input Collection
+#1. User Input Collection
 The process starts when a user submits a form with details like target market, location, or business type.
-Data Gathering (Automation)
+
+#2. Data Gathering (Automation)
 The system automatically searches platforms (e.g., maps/review sites) to collect business listings and customer feedback.
-AI Analysis
+
+#3. AI Analysis:
 The AI processes reviews and data to identify patterns—such as customer sentiment, common complaints, and strengths.
-Insight Generation
+
+#4. Insight Generation:
 Finally, it generates clear insights and summaries to help understand market trends and opportunities.
