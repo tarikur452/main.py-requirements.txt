@@ -1,0 +1,413 @@
+{
+  "name": "market research ai agent",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Market research agent",
+        "formDescription": "Market research agent",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Search_query",
+              "placeholder": "Inter your Query"
+            },
+            {
+              "fieldLabel": "Location",
+              "placeholder": "Provide your location"
+            },
+            {
+              "fieldLabel": "language",
+              "placeholder": "Language"
+            },
+            {
+              "fieldLabel": "business category",
+              "placeholder": "Inter "
+            },
+            {
+              "fieldLabel": "City_name",
+              "placeholder": "City"
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "Enter your Email"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        352,
+        -80
+      ],
+      "id": "68b82ae9-d63d-4025-8bc3-73923273557d",
+      "name": "On form submission",
+      "webhookId": "9e812577-c16c-441c-9112-86218f3a0540"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "183c3925-f9dc-4c3d-9d28-1508816b2fcc",
+              "name": "Search_query",
+              "value": "={{ $json.Search_query }}",
+              "type": "string"
+            },
+            {
+              "id": "f89fb311-0e7b-46df-9341-a1d7b81978c2",
+              "name": "Location",
+              "value": "={{ $json.Location }}",
+              "type": "string"
+            },
+            {
+              "id": "f570d9de-1bb2-41e8-a401-d6eb28755b4d",
+              "name": "business category",
+              "value": "={{ $json['business category'] }}",
+              "type": "string"
+            },
+            {
+              "id": "0a2f544e-6b0a-4c38-aca8-3d9804afe3e6",
+              "name": "City_name",
+              "value": "={{ $json.City_name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        -80
+      ],
+      "id": "4fb1944b-ef97-4deb-b604-9cdfa968316c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "google_maps",
+        "q": "={{ $json.Search_query }}",
+        "type": "=search",
+        "additionalFields": {
+          "hl": "en",
+          "gl": "={{ $json.Location }}"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApi",
+      "typeVersion": 1,
+      "position": [
+        768,
+        -80
+      ],
+      "id": "dd395e91-17b3-40e3-ad43-9f16f65d0f56",
+      "name": "Google_maps search",
+      "credentials": {
+        "serpApi": {
+          "id": "6zwNoyROA5l5yutg",
+          "name": "HpSerpapi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1264,
+        -144
+      ],
+      "id": "1a3e0cdd-a8e4-455b-afc4-8531f264025a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.reviews_link }}",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"api_key\": \"ffbea3b40ea41b0e10dbceb1302b81209669f83c5b9b75ed8309dbc3f2ae624d\"\n}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "timeout": 3000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1424,
+        -48
+      ],
+      "id": "f6caef24-7e9c-4642-962e-081bf8afa4b2",
+      "name": "Get Reviews content"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =============================================\n// Safe Extraction\n// =============================================\n\n// Main data\nconst inputData = $input.first()?.json || {};\nconst localResults = inputData.local_results || [];\n\n// Try to safely get user config\nlet userConfig = {};\n\ntry {\n  userConfig = $('User Input Configuration')?.item?.json || {};\n} catch (error) {\n  console.log('User Input Configuration node not found. Using empty config.');\n}\n\n// Logging\nconsole.log(`Processing ${localResults.length} search results for: ${userConfig.search_query || 'N/A'}`);\n\nconst places = localResults\n  .map(place => {\n\n    return {\n      place_name: place.title || 'Unknown',\n      address: place.address || 'No address',\n      type: place.type || 'Unknown',\n\n      rating: place.rating || 'No rating',\n      reviews_count: place.reviews || 0,\n      reviews_link: place.reviews_link || null,\n\n      data_id: place.data_id || null,\n      place_id: place.place_id || null,\n      lsig: place.lsig || null,\n\n      phone: place.phone || null,\n      website: place.website || null,\n\n      thumbnail: place.thumbnail || null,\n      operating_hours: place.operating_hours || null,\n      price_level: place.price_level || null,\n      plus_code: place.plus_code || null,\n\n      coordinates: {\n        lat: place.gps_coordinates?.latitude || null,\n        lng: place.gps_coordinates?.longitude || null\n      },\n\n      search_context: {\n        original_query: userConfig.search_query || null,\n        analysis_focus: userConfig.analysis_focus || null,\n        city: userConfig.city_name || null,\n        search_timestamp: new Date().toISOString()\n      }\n    };\n  })\n\n  .filter(place =>\n    place.reviews_link ||\n    (place.rating && place.rating !== 'No rating') ||\n    place.reviews_count > 0\n  );\n\nconsole.log(`Filtered to ${places.length} places`);\n\nreturn places.map(place => ({ json: place }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        -144
+      ],
+      "id": "79ef444e-1b75-45cc-a05f-bcb429e43eb5",
+      "name": "Enhanced Extract Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safe data access with fallback protection\n\nlet currentItem = {};\nlet userConfig = {};\nlet reviewsResponse = {};\n\ntry {\n    currentItem = $('Loop Over Items')?.item?.json || {};\n} catch (error) {\n    console.log('Loop Over Items node not found');\n}\n\ntry {\n    userConfig = $('User Input Configuration')?.item?.json || {};\n} catch (error) {\n    console.log('User Input Configuration node not found');\n}\n\ntry {\n    reviewsResponse = $input.first()?.json || {};\n} catch (error) {\n    console.log('No reviews input found');\n}\n\n\n// Function to calculate completeness score\nfunction calculateCompletenessScore(placeData = {}) {\n    const fields = [\n        'place_name',\n        'address',\n        'rating',\n        'phone',\n        'website',\n        'operating_hours'\n    ];\n\n    const filledFields = fields.filter(field =>\n        placeData?.[field] &&\n        placeData[field] !== 'Unknown' &&\n        placeData[field] !== 'No address'\n    );\n\n    return fields.length\n        ? Math.round((filledFields.length / fields.length) * 100)\n        : 0;\n}\n\n\n// Build combined data safely\nconst combinedData = {\n\n    place_name: currentItem.place_name || null,\n    address: currentItem.address || null,\n    rating: currentItem.rating || null,\n    reviews_count: currentItem.reviews_count || 0,\n    data_id: currentItem.data_id || null,\n    type: currentItem.type || null,\n    phone: currentItem.phone || null,\n    website: currentItem.website || null,\n    coordinates: currentItem.coordinates || null,\n    operating_hours: currentItem.operating_hours || null,\n    price_level: currentItem.price_level || null,\n\n    reviews_content: Object.keys(reviewsResponse).length\n        ? reviewsResponse\n        : { error: 'No reviews data available' },\n\n    analysis_metadata: {\n        search_query: userConfig.search_query || null,\n        analysis_focus: userConfig.analysis_focus || null,\n        target_city: userConfig.city_name || null,\n        data_collection_time: new Date().toISOString(),\n        has_reviews: !!reviewsResponse?.reviews,\n        review_source: currentItem.reviews_link || 'No review link',\n        place_completeness_score: calculateCompletenessScore(currentItem)\n    }\n};\n\n\n// Debug logs\nconsole.log(\n    `Processing ${combinedData.analysis_metadata.analysis_focus || 'Unknown'}: ${combinedData.place_name || 'Unnamed Place'}`\n);\n\nconsole.log(\n    `Data completeness: ${combinedData.analysis_metadata.place_completeness_score}%`\n);\n\n\n// Final return\nreturn {\n    json: combinedData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        -48
+      ],
+      "id": "9e33fd2f-1bba-487c-8531-a5e3e1b7fb2a",
+      "name": "Enhanced Combine Data"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        -208
+      ],
+      "id": "d2df6677-5af4-44ff-ad26-04f121b62e3c",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. DYNAMIC DATA DISCOVERY\nconst allPlaces = $input.all();\n\nlet userConfig = {};\n\ntry {\n    // We attempt to find the node that started the workflow\n    // If your form node has a different name, change \"On form submission\" below\n    userConfig = $('On form submission').first().json;\n} catch (e) {\n    try {\n        // Fallback: Try the \"Edit Fields\" node if that's where you defined the focus\n        userConfig = $('Edit Fields').first().json;\n    } catch (e2) {\n        // Last Resort: Use a placeholder so the code doesn't error out\n        userConfig = {\n            analysis_focus: \"Market Research\",\n            city_name: \"Local Area\",\n            search_query: \"General Search\"\n        };\n        console.log(\"Using default config because trigger nodes weren't found.\");\n    }\n}\n\n// 2. INITIALIZE PROMPT\nlet analysisPrompt = `MARKET RESEARCH DATA ANALYSIS\\n`;\nanalysisPrompt += `Research Focus: ${userConfig.analysis_focus || 'N/A'}\\n`;\nanalysisPrompt += `Location: ${userConfig.city_name || 'N/A'}\\n`;\nanalysisPrompt += `Search Query: \"${userConfig.search_query || 'N/A'}\"\\n`;\nanalysisPrompt += `Total Locations Found: ${allPlaces.length}\\n`;\nanalysisPrompt += `Analysis Date: ${new Date().toLocaleDateString('vi-VN')}\\n\\n`;\n\nanalysisPrompt += `=== DATASET OVERVIEW ===\\n`;\n\n// 3. STATS TRACKING\nlet totalReviews = 0;\nlet totalRatingSum = 0;\nlet ratedCount = 0;\nlet completenessScores = [];\n\n// 4. PROCESS EACH PLACE (Like \"EDTECH EDU LLC\")\nallPlaces.forEach((place, index) => {\n    const data = place.json;\n\n    // Statistics Calculation\n    if (data.reviews_count) totalReviews += parseInt(data.reviews_count) || 0;\n    if (data.rating && data.rating !== 'No rating') {\n        totalRatingSum += parseFloat(data.rating);\n        ratedCount++;\n    }\n    \n    // Safety check for metadata\n    const compScore = data.analysis_metadata?.place_completeness_score;\n    if (compScore) completenessScores.push(compScore);\n\n    // Build Entry String\n    analysisPrompt += `\\n${index + 1}. ${data.place_name || 'Unknown'}\\n`;\n    analysisPrompt += `   Address: ${data.address || 'N/A'}\\n`;\n    analysisPrompt += `   Rating: ${data.rating || 'N/A'}/5 (${data.reviews_count || 0} reviews)\\n`;\n    \n    if (data.phone) analysisPrompt += `   Phone: ${data.phone}\\n`;\n    if (data.website) analysisPrompt += `   Website: ${data.website}\\n`;\n    \n    // Add Hours (Formatted)\n    if (data.operating_hours) {\n        analysisPrompt += `   Hours: ${data.operating_hours.monday || 'Closed'} - ${data.operating_hours.friday || 'Closed'}\\n`;\n    }\n\n    analysisPrompt += `   Data Completeness: ${compScore ?? 'N/A'}%\\n`;\n    analysisPrompt += `\\n${'-'.repeat(40)}\\n`;\n});\n\n// 5. CALCULATE AVERAGES\nconst avgRating = ratedCount > 0 ? (totalRatingSum / ratedCount).toFixed(2) : 0;\nconst avgComp = completenessScores.length > 0 ? \n    (completenessScores.reduce((a, b) => a + b, 0) / completenessScores.length).toFixed(1) : 'N/A';\n\nanalysisPrompt += `\\n=== SUMMARY STATISTICS ===\\n`;\nanalysisPrompt += `Average Rating: ${avgRating}/5\\n`;\nanalysisPrompt += `Average Completeness: ${avgComp}%\\n`;\n\n// 6. FINAL OUTPUT\nreturn {\n    analysis_prompt: analysisPrompt,\n    summary_stats: {\n        total_places: allPlaces.length,\n        average_rating: avgRating,\n        average_completeness: avgComp\n    },\n    raw_data: allPlaces.map(p => p.json)\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -208
+      ],
+      "id": "b3f83a74-0163-4f0c-ad24-f4109b082c92",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Role\nYou are an Advanced Market Research Intelligence Agent specialized in deep analysis, insight generation, and actionable strategy development. Your job is to transform raw customer data, business metrics, and local search results into a comprehensive, high-value market analysis report.\n\nYou have received real, user-generated market data about\"{{ $('Edit Fields').item.json.Search_query }}\" in\"{{ $('Edit Fields').item.json.City_name }}\" \n\n{{ JSON.stringify($json.raw_data, null, 2) }}\n\n\nYour Mission:\nProduce a complete, insight-driven market analysis report using the structure below. All insights must be data-driven, actionable, and written in professional English.\n\n1. Executive Summary\nProvide a high-level overview of the market landscape in\"{{ $('On form submission').item.json.City_name }}\"\n\nIdentify the \"Market Leader\" based on ratings and review volume.\n\nMarket size and density for\"{{ $('On form submission').item.json.Search_query }}\"\n\n2. Competitive Benchmarking\nCompare the top 5 businesses based on the rating and reviews_count provided.\n\nAnalyze operational strengths (e.g., businesses with extensive operating_hours vs. those with limited availability).\n\n3. Sentiment & Customer Experience Analysis\nExtract key themes from the provided review snippets.\n\nIdentify recurring \"Pain Points\" and \"Value Drivers\" mentioned by customers.\n\n4. Gaps & Opportunities\nIdentify underserved areas (e.g., high-demand niches with low \"Data Completeness\" or poor average ratings).\n\nSuggest specific strategies for a new entrant to differentiate themselves.\n\n5. Strategic Recommendations\nProvide 3-5 actionable steps for businesses in this sector to improve their market share.\n\nConstraint & Tone\nObjective: Do not hallucinate data; only use the information provided in the raw_data block.\n\nTone: Professional, analytical, and authoritative.\n\nFormatting: Use Markdown (bolding, headers, and bullet points) for readability.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2000,
+        -208
+      ],
+      "id": "fdf260d8-c6bc-4d2c-950d-dfa883d48c39",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        -48
+      ],
+      "id": "167461e2-779e-4251-bac4-679427f8484a",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "FmTBTkLudq3iGd7t",
+          "name": "Google Gemini(PaLM) Api account 765"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('On form submission').item.json.Email }}",
+        "subject": "=MARKET RESEARCH For  {{ $('On form submission').item.json.Search_query }}",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n<style>\n    body {\n        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n        line-height: 1.6;\n        color: #333;\n        margin: 0;\n        padding: 20px;\n        background-color: #f4f7f6;\n    }\n    .container {\n        max-width: 800px;\n        margin: auto;\n        background: #fff;\n        padding: 40px;\n        border-radius: 8px;\n        box-shadow: 0 4px 15px rgba(0,0,0,0.1);\n    }\n    .header {\n        border-bottom: 3px solid #2c3e50;\n        padding-bottom: 20px;\n        margin-bottom: 30px;\n    }\n    h1 { color: #2c3e50; margin: 0; font-size: 24px; }\n    h2 { \n        color: #2980b9; \n        border-left: 5px solid #2980b9; \n        padding-left: 15px; \n        margin-top: 40px;\n        font-size: 20px;\n    }\n    h3 { color: #34495e; font-size: 18px; margin-top: 25px; }\n    .meta-box {\n        background-color: #eef2f7;\n        padding: 15px;\n        border-radius: 5px;\n        font-size: 0.9em;\n        margin-bottom: 20px;\n    }\n    .warning-box {\n        background-color: #fff3cd;\n        border: 1px solid #ffeeba;\n        color: #856404;\n        padding: 15px;\n        border-radius: 5px;\n        margin-bottom: 20px;\n    }\n    table {\n        width: 100%;\n        border-collapse: collapse;\n        margin: 20px 0;\n    }\n    table, th, td {\n        border: 1px solid #ddd;\n    }\n    th {\n        background-color: #f2f2f2;\n        padding: 12px;\n        text-align: left;\n    }\n    td {\n        padding: 12px;\n        vertical-align: top;\n    }\n    .badge {\n        display: inline-block;\n        padding: 3px 10px;\n        border-radius: 12px;\n        font-size: 12px;\n        font-weight: bold;\n        background: #27ae60;\n        color: white;\n    }\n    .highlight {\n        color: #d35400;\n        font-weight: bold;\n    }\n    ul { padding-left: 20px; }\n    li { margin-bottom: 8px; }\n    .footer {\n        margin-top: 50px;\n        font-size: 12px;\n        text-align: center;\n        color: #95a5a6;\n        border-top: 1px solid #eee;\n        padding-top: 20px;\n    }\n</style>\n</head>\n<body>\n\n<div class=\"container\">\n    <div class=\"header\">\n        <h1>Advanced Market Research Intelligence Report</h1>\n        <p><strong>Landscape Analysis: EdTech</strong></p>\n    </div>\n\n    <div class=\"meta-box\">\n        <strong>Report Date:</strong> 2026-03-04<br>\n        <strong>Target Regions:</strong> Illinois (USA), Indiana (USA), Bengaluru (India)\n    </div>\n\n    <div class=\"warning-box\">\n        <strong>Geographic Discrepancy Note:</strong> No data found for \"New York.\" Analysis is based strictly on provided entities in Illinois, Indiana, and Bengaluru.\n    </div>\n\n    <h2>1. Executive Summary</h2>\n    <p>The EdTech market represented in this dataset is highly fragmented. While US-based entities show a presence, they suffer from a <strong>\"Review Desert,\"</strong> with almost no public customer engagement. In contrast, the Indian market segment shows high maturity in customer feedback and satisfaction.</p>\n    \n    <p><strong>Market Leader:</strong> <span class=\"badge\">Internastra Edtech Pvt Ltd</span> (Bengaluru). With a perfect 5.0 rating across 35 reviews, they are the only entity showing significant digital-first customer success.</p>\n\n    \n\n    <h2>2. Competitive Benchmarking</h2>\n    <table>\n        <thead>\n            <tr>\n                <th>Entity Name</th>\n                <th>Location</th>\n                <th>Rating</th>\n                <th>Type</th>\n            </tr>\n        </thead>\n        <tbody>\n            <tr>\n                <td><strong>Internastra Edtech</strong></td>\n                <td>Bengaluru, IN</td>\n                <td>5.0 (35 reviews)</td>\n                <td>Institution</td>\n            </tr>\n            <tr>\n                <td><strong>EdTech Consulting</strong></td>\n                <td>Wheatfield, IN</td>\n                <td>4.0 (1 review)</td>\n                <td>Consultant</td>\n            </tr>\n            <tr>\n                <td><strong>Simply EdTech</strong></td>\n                <td>Rolling Meadows, IL</td>\n                <td>N/A</td>\n                <td>Consultant</td>\n            </tr>\n        </tbody>\n    </table>\n\n    <h2>3. Sentiment & Customer Experience</h2>\n    <h3>Key Value Drivers (Internastra)</h3>\n    <ul>\n        <li><strong>Mentorship:</strong> Personalized guidance at every step.</li>\n        <li><strong>Practicality:</strong> Focus on real-time projects and industry exposure.</li>\n        <li><strong>Soft Skills:</strong> Improvement in communication and confidence.</li>\n    </ul>\n\n    <h3>Pain Points</h3>\n    <p>The primary pain point for US entities is <strong>Invisible Reputation</strong>. A lack of online reviews creates a \"trust gap\" for prospective modern learners who rely on social proof.</p>\n\n    <h2>4. Gaps & Opportunities</h2>\n    <ul>\n        <li><span class=\"highlight\">Reputation Management:</span> Huge opportunity for US firms to claim the \"local authority\" space by soliciting reviews.</li>\n        <li><span class=\"highlight\">Operating Hours:</span> Gap in \"after-hours\" support in the US market.</li>\n        <li><span class=\"highlight\">Career outcomes:</span> Opportunity to shift from general consulting to result-oriented \"job-ready\" training.</li>\n    </ul>\n\n    <h2>5. Strategic Recommendations</h2>\n    <ol>\n        <li><strong>Audit Digital Profiles:</strong> Claim and optimize Google Business Profiles for all US locations.</li>\n        <li><strong>Productize Mentorship:</strong> Pivot service models to include structured mentor-student paths.</li>\n        <li><strong>Extended Accessibility:</strong> Pilot evening or weekend \"Power Sessions\" to compete with global flexible models.</li>\n    </ol>\n\n    <div class=\"footer\">\n        Generated for amipias452@gmail.com | Confidential Market Intelligence\n    </div>\n</div>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2352,
+        -208
+      ],
+      "id": "32442ffa-4c1a-4055-a3e2-85b849d58c01",
+      "name": "Send a message",
+      "webhookId": "b3de5c9d-219a-4d45-986a-4912b2de7a39",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "pTtUdiK7WqAJmAlG",
+          "name": "Gmail account 463"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Google_maps search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_maps search": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Reviews content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reviews content": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Combine Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Combine Data": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "2d201896-05b6-4af8-91e8-a1c2c01c6c45",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5f00bba974abf03cb5183d4d65f8a9645a781b04770df6a7d08284fca87d50b3"
+  },
+  "id": "H9G3c2JY3uHextMH",
+  "tags": [
+    {
+      "updatedAt": "2026-02-16T17:43:47.421Z",
+      "createdAt": "2026-02-16T17:43:47.421Z",
+      "id": "PKfllyWvby91LAIQ",
+      "name": "active"
+    }
+  ]
+}
